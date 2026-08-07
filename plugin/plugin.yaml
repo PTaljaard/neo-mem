@@ -1,0 +1,15 @@
+name: neo4j-graphrag-memory
+version: 0.2.0
+description: |
+  Neo4j-backed GraphRAG memory provider for AI agents.
+  Stores conversational facts as nodes with embeddings and enables
+  similarity-search and graph traversal for persistent, recallable memory.
+  Embeddings are configurable: local Ollama (default) or any
+  OpenAI-compatible API (OpenAI, OpenRouter, Azure).
+pip_dependencies:
+  - "neo4j>=5.15"
+  - "numpy"
+  - "openai>=1.0"
+requires_env: []
+hooks:
+  - on_session_end

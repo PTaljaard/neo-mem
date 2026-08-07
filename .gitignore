@@ -1,0 +1,29 @@
+# Secrets — never commit these
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Data
+neo4j_data/
+qdrant_storage/
+*.dump
+*.dump.gz
+
+# Personal / research data
+papers/
+kb/
+*.pdf
