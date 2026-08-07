@@ -21,4 +21,3 @@ jobs:
       - run: python -m py_compile plugin/__init__.py
       - run: pip install ruff
       - run: ruff check plugin/__init__.py --no-cache
-        continue-on-error: true
