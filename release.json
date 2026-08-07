@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.1.0",
-  "name": "v0.1.0 - Initial release",
-  "body": "First stable release of neo-mem. Neo4j-backed GraphRAG memory plugin with configurable embeddings (Ollama default, OpenAI-compatible fallback). Includes Docker Compose, MCP server, and full documentation.",
-  "draft": false,
-  "prerelease": false
-}
