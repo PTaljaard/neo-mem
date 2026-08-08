@@ -1,7 +1,7 @@
 # Contributing to neo-mem
 
-Thank you for your interest! This project started as part of a **PhD in
-Agentic Complex Problem Solving** at the University of South Africa and is
+Thank you for your interest! This project started as part of a concept note for a **PhD in
+Agentic Complex Problem Solving** at the University of Stellenbosch Business School (declined - referred to Dept Philosophy in 2018) and is
 used in production daily by the author.
 
 ## Expectations
