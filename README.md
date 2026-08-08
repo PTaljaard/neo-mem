@@ -25,6 +25,168 @@ past memories — semantic search over everything you've ever discussed.
   server (Works with Claude Code, Codex, and any MCP client).
 - **One-command setup** — `docker compose up` brings up Neo4j with the
   vector index pre-configured.
+- **Example ontology** — seed data demonstrating the class hierarchy,
+  properties, multi-tenancy model, and memory structure
+  (`examples/ontology/seed.cypher`).
+
+## Ontology
+
+neo-mem ships with a minimal example ontology that demonstrates the
+class hierarchy, multi-tenancy model, and memory structure. Below is
+the conceptual class diagram:
+
+```mermaid
+classDiagram
+    class Root {
+        <<meta>>
+        class_id: string
+        label: string
+        description: string
+        extends: string
+    }
+    class Upper {
+        <<bridge>>
+        extends: Root
+    }
+    class Domain {
+        <<container>>
+        extends: Upper
+    }
+    class Fact {
+        <<memory>>
+        uid: string
+        content: string
+        embedding: float[]
+        tenant: string
+    }
+    class Chunk {
+        uid: string
+        content: string
+        position: int
+        tenant: string
+    }
+    class Document {
+        uid: string
+        title: string
+        tenant: string
+    }
+    class Person {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class Organization {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class System {
+        uid: string
+        name: string
+        tenant: string
+    }
+    class Policy {
+        uid: string
+        title: string
+        tenant: string
+        shared: bool
+    }
+    class Dataset {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class AI_Agent {
+        uid: string
+        name: string
+        provider: string
+        tenant: string
+    }
+    class Event {
+        uid: string
+        timestamp: datetime
+        tenant: string
+    }
+    class Role {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class Task {
+        uid: string
+        summary: string
+        status: string
+        tenant: string
+    }
+    class Standard {
+        uid: string
+        name: string
+        shared: bool
+    }
+    class Contract {
+        uid: string
+        title: string
+        parties: string[]
+        tenant: string
+    }
+    class Property {
+        <<schema>>
+        key: string
+        description: string
+        datatype: string
+    }
+
+    Root <|-- Upper : extends
+    Upper <|-- Domain : extends
+    Upper <|-- Fact
+    Upper <|-- Chunk
+    Upper <|-- Document
+    Upper <|-- Person
+    Upper <|-- Organization
+    Upper <|-- System
+    Upper <|-- Policy
+    Upper <|-- Dataset
+    Upper <|-- AI_Agent
+    Upper <|-- Event
+    Upper <|-- Role
+    Upper <|-- Task
+    Upper <|-- Standard
+    Upper <|-- Contract
+    Fact "1" --> "*" System : HAS_SUBJECT
+    Fact "1" --> "*" Person : HAS_SUBJECT
+    Fact "1" --> "*" Organization : HAS_SUBJECT
+    Document "1" --> "*" Chunk : HAS_CHUNK
+    Person "1" --> "1" Organization : WORKS_FOR
+```
+
+### Multi-tenancy model
+
+Nodes carry a `tenant` string to isolate data per user. Shared reference
+data (standards, regulations, ontology schema) omits the tenant field or
+sets `shared: true`:
+
+| Scope | Example | `tenant` | `shared` |
+|---|---|---|---|
+| User-specific facts | `Fact`, `Task`, `Chunk` | `"tenant-a"` / `"tenant-b"` | — |
+| User-specific entities | `Person`, `System` | `"tenant-a"` / `"tenant-b"` | — |
+| Shared entities | `Organization`, `Standard` | — | `true` |
+| Schema | `OntologyClass`, `Property` | — | — |
+
+### Query pattern
+
+```cypher
+-- Recall only this tenant's memories
+MATCH (f:Fact)
+WHERE f.tenant = $tenant
+CALL db.index.vector.queryNodes('fact_embedding_index', 5, $query_vector)
+YIELD node, score
+WHERE node.tenant = $tenant
+RETURN node.content AS memory, score
+```
 
 ## Quick start
 
