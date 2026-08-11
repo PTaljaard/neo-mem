@@ -26,6 +26,8 @@ NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 EMBED_MODEL = "nomic-embed-text"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
+CHAT_MODEL = "gemma4:e4b-it-qat"   # For claim extraction
+CHAT_BASE = "http://192.168.0.200:11434/v1"
 FIRECRAWL_KEY = "fc-cceb0426298f473bb8cef0a512924bab"
 FIRECRAWL_URL = "https://api.firecrawl.dev/v1/scrape"
 
@@ -165,7 +167,7 @@ Article text:
 
     try:
         resp = llm.chat.completions.create(
-            model=EMBED_MODEL,
+            model=CHAT_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1, max_tokens=512
         )
@@ -235,8 +237,9 @@ def ingest_articles(articles, emb_client, neo4j_driver, use_firecrawl=True, clai
         # Extract claims
         claims_texts, claims_confs = extract_claims(body or f"{title}. {summary}", emb_client, claim_count)
         
-        # Create node with claims
+        # Create node with claims as separate Claim nodes
         with neo4j_driver.session() as session:
+            # Create NewsArticle node
             session.run("""
                 MERGE (n:NewsArticle {uid: $uid})
                 SET n.title = $title,
@@ -248,14 +251,27 @@ def ingest_articles(articles, emb_client, neo4j_driver, use_firecrawl=True, clai
                     n.published_at = datetime($published),
                     n.fetched_at = datetime(),
                     n.embedding = $emb,
-                    n.claims = $claims,
-                    n.claim_count = $cc,
-                    n.claim_confidences = $confs
+                    n.claim_count = $cc
             """, uid=uid, title=title, summary=summary,
                  body=body, url=article["url"], source=article["source"],
                  category=article["category"],
                  published=_parse_date(article["published_at"]),
-                 emb=embedding, claims=claims_texts, cc=len(claims_texts), confs=claims_confs)
+                 emb=embedding, cc=len(claims_texts))
+            
+            # Create Claim nodes and link them
+            for i, (ct, cf) in enumerate(zip(claims_texts, claims_confs)):
+                cuid = f"{uid}-c{i}"
+                session.run("""
+                    MERGE (c:Claim {uid: $cu})
+                    SET c.text = $ct,
+                        c.confidence = $cf,
+                        c.extracted_at = datetime(),
+                        c.source_uid = $su
+                """, cu=cuid, ct=ct, cf=cf, su=uid)
+                session.run("""
+                    MATCH (n:NewsArticle {uid: $nu}), (c:Claim {uid: $cu})
+                    MERGE (n)-[:CONTAINS_CLAIM]->(c)
+                """, nu=uid, cu=cuid)
         count += 1
 
     return count, skipped, fc_success, fc_fail

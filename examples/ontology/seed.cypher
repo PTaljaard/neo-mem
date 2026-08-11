@@ -63,7 +63,28 @@ MERGE (:OntologyClass {
 SET updated_at = datetime(),
     properties = ["uid", "title", "source_uri", "content_type", "ingested_at", "tenant"];
 
-// ── 2b. Shared domain entities ──────────────────────────────────────────────
+// ── 2c. News & Claims ───────────────────────────────────────────────────
+
+MERGE (:OntologyClass {
+  class_id:   "Claim",
+  label:      "Claim",
+  description: "A factual assertion extracted from a news article. The atomic unit of strategic intelligence.",
+  extends:    "Upper"
+})
+SET updated_at = datetime(),
+    properties = ["uid", "text", "confidence", "extracted_at", "source_uid"];
+
+MERGE (:OntologyClass {
+  class_id:   "NewsArticle",
+  label:      "NewsArticle",
+  description: "A news article ingested from an RSS feed with full text, metadata, and extracted claims.",
+  extends:    "Upper"
+})
+SET updated_at = datetime(),
+    properties = ["uid", "title", "summary", "body", "url", "source", "category",
+                  "fetched_at", "published_at", "embedding"];
+
+// ── 2d. Shared domain entities ──────────────────────────────────────────────
 
 MERGE (:OntologyClass {
   class_id:   "Person",
