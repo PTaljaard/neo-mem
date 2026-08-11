@@ -1,0 +1,125 @@
+classDiagram
+    class Root {
+        <<meta>>
+        class_id: string
+        label: string
+        description: string
+        extends: string
+    }
+    class Upper {
+        <<bridge>>
+        extends: Root
+    }
+    class Domain {
+        <<container>>
+        extends: Upper
+    }
+    class Fact {
+        <<memory>>
+        uid: string
+        content: string
+        embedding: float[]
+        tenant: string
+    }
+    class Chunk {
+        uid: string
+        content: string
+        position: int
+        tenant: string
+    }
+    class Document {
+        uid: string
+        title: string
+        tenant: string
+    }
+    class Person {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class Organization {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class System {
+        uid: string
+        name: string
+        tenant: string
+    }
+    class Policy {
+        uid: string
+        title: string
+        tenant: string
+        shared: bool
+    }
+    class Dataset {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class AI_Agent {
+        uid: string
+        name: string
+        provider: string
+        tenant: string
+    }
+    class Event {
+        uid: string
+        timestamp: datetime
+        tenant: string
+    }
+    class Role {
+        uid: string
+        name: string
+        tenant: string
+        shared: bool
+    }
+    class Task {
+        uid: string
+        summary: string
+        status: string
+        tenant: string
+    }
+    class Standard {
+        uid: string
+        name: string
+        shared: bool
+    }
+    class Contract {
+        uid: string
+        title: string
+        parties: string[]
+        tenant: string
+    }
+    class Property {
+        <<schema>>
+        key: string
+        description: string
+        datatype: string
+    }
+
+    Root <|-- Upper : extends
+    Upper <|-- Domain : extends
+    Upper <|-- Fact
+    Upper <|-- Chunk
+    Upper <|-- Document
+    Upper <|-- Person
+    Upper <|-- Organization
+    Upper <|-- System
+    Upper <|-- Policy
+    Upper <|-- Dataset
+    Upper <|-- AI_Agent
+    Upper <|-- Event
+    Upper <|-- Role
+    Upper <|-- Task
+    Upper <|-- Standard
+    Upper <|-- Contract
+    Fact "1" --> "*" System : HAS_SUBJECT
+    Fact "1" --> "*" Person : HAS_SUBJECT
+    Fact "1" --> "*" Organization : HAS_SUBJECT
+    Document "1" --> "*" Chunk : HAS_CHUNK
+    Person "1" --> "1" Organization : WORKS_FOR
