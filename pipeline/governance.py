@@ -91,10 +91,10 @@ def run_validation(n4j, llm):
         r = s.run("""
             MATCH (f:Fact)
             WHERE f.governance_status = $status
-            RETURN f.uid, f.text
+            RETURN coalesce(f.uid, f.fact_id) AS uid, coalesce(f.text, f.triple_text) AS text
             LIMIT 50
         """, status=PENDING)
-        facts = [(r["f.uid"], r["f.text"]) for r in r]
+        facts = [(r["uid"], r["text"]) for r in r]
     print(f"🔍 Validating {len(facts)} pending facts")
 
     for uid, text in facts:
@@ -143,15 +143,16 @@ def approve_fact(n4j, uid, notes=""):
     """Manually approve a pending fact."""
     with n4j.session() as s:
         r = s.run("""
-            MATCH (f:Fact {uid: $u})
+            MATCH (f:Fact)
+            WHERE f.uid = $u OR f.fact_id = $u
             SET f.governance_status = $s,
                 f.governance_checked_at = datetime(),
                 f.governance_notes = $n
-            RETURN f.text
+            RETURN coalesce(f.text, f.triple_text) AS txt
         """, u=uid, s=APPROVED, n=notes)
         row = r.single()
         if row:
-            print(f"✅ Approved: {row['f.text'][:60]}")
+            print(f"✅ Approved: {row['txt'][:60]}")
         else:
             print(f"❌ Fact not found: {uid}")
 
@@ -160,11 +161,12 @@ def reject_fact(n4j, uid, reason="Rejected by HITL"):
     """Reject a pending fact."""
     with n4j.session() as s:
         r = s.run("""
-            MATCH (f:Fact {uid: $u})
+            MATCH (f:Fact)
+            WHERE f.uid = $u OR f.fact_id = $u
             SET f.governance_status = $s,
                 f.governance_checked_at = datetime(),
                 f.governance_notes = $n
-            RETURN f.text
+            RETURN coalesce(f.text, f.triple_text) AS txt
         """, u=uid, s=REJECTED, n=reason)
         row = r.single()
         if row:
@@ -178,24 +180,22 @@ def show_stats(n4j):
     with n4j.session() as s:
         r = s.run("""
             MATCH (f:Fact)
-            RETURN f.governance_status, count(f) AS cnt
+            RETURN coalesce(f.governance_status, 'NONE') AS status, count(f) AS cnt
             ORDER BY cnt DESC
         """)
         print("📊 Governance Statistics:")
         total = 0
         for row in r:
-            print(f"  {row['f.governance_status'] or 'NONE':15s} {row['cnt']:5d}")
+            print(f"  {row['status']:15s} {row['cnt']:5d}")
             total += row['cnt']
         print(f"  {'TOTAL':15s} {total:5d}")
 
-        # Facts by governance_status
+        # Facts by governance_status with percentage
         r = s.run("""
-            MATCH (f:Fact) 
-            WHERE f.governance_status IS NOT NULL
+            MATCH (f:Fact) WHERE f.governance_status IS NOT NULL
             WITH f.governance_status AS status, count(f) AS cnt
             RETURN status, cnt ORDER BY cnt DESC
         """)
-        # Show as percentage
         for row in r:
             pct = row['cnt'] / total * 100 if total > 0 else 0
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
