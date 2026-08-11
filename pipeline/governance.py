@@ -124,11 +124,13 @@ def list_pending(n4j):
         r = s.run("""
             MATCH (f:Fact)
             WHERE f.governance_status IN [$p, $c]
-            RETURN f.uid, f.text, f.governance_status, f.governance_notes
+            RETURN coalesce(f.uid, f.fact_id) AS uid,
+                   coalesce(f.text, f.triple_text) AS text,
+                   f.governance_status, f.governance_notes
             ORDER BY f.governance_checked_at DESC
             LIMIT 30
         """, p=PENDING, c=CONFLICT)
-        facts = [(r["f.uid"], r["f.text"][:80], r["f.governance_status"], r["f.governance_notes"][:60]) for r in r]
+        facts = [(r["uid"], (r["text"] or "?")[:80], r["f.governance_status"], (r["f.governance_notes"] or "")[:60]) for r in r]
     if facts:
         print(f"📋 {len(facts)} facts pending HITL review:")
         for uid, text, status, notes in facts:
