@@ -76,7 +76,12 @@ def main():
     sub.add_parser("verify-commentators", help="Verify commentator graph")
     sub.add_parser("list-tasks", help="List kanban tasks for the PhD pipeline")
 
-    # ── help ────────────────────────────────────────────────────────────
+    # ── governance ────────────────────────────────────────────────────────
+    gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")
+    gov_p.add_argument("action", choices=["init", "validate", "review", "approve", "reject", "stats"])
+    gov_p.add_argument("--uid", help="Fact UID (for approve/reject)")
+    gov_p.add_argument("--notes", "-n", default="", help="Notes for approve/reject")
+    gov_p.add_argument("--reason", "-r", default="", help="Reason for reject")
     sub.add_parser("help", help="Show this help")
 
     args = p.parse_args()
@@ -94,7 +99,16 @@ def main():
         "verify-commentators": "verify_commentators.py",
     }
 
-    if args.command == "help":
+    if args.command == "governance":
+        script_args = [args.action]
+        if args.uid:
+            script_args.extend(["--uid", args.uid])
+        if args.notes:
+            script_args.extend(["--notes", args.notes])
+        if args.reason:
+            script_args.extend(["--reason", args.reason])
+        run_script("governance.py", script_args)
+    elif args.command == "help":
         p.print_help()
         sys.exit(0)
 
