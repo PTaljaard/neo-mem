@@ -75,7 +75,10 @@ def main():
     sub.add_parser("verify-claims", help="Verify Claim node structure")
     sub.add_parser("verify-commentators", help="Verify commentator graph")
     sub.add_parser("list-tasks", help="List kanban tasks for the PhD pipeline")
-    sub.add_parser("build-concepts", help="Build concept hierarchy from entities (AutoSchemaKG-inspired)")
+    bc_p = sub.add_parser("build-concepts", help="Build concept hierarchy from entities (AutoSchemaKG-inspired)")
+    bc_p.add_argument("--dry-run", action="store_true")
+    bc_p.add_argument("--limit", type=int, default=200)
+    bc_p.add_argument("--entity-type")
 
     # ── governance ────────────────────────────────────────────────────────
     gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")
