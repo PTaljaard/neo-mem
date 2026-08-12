@@ -84,6 +84,14 @@ def main():
     ee_p.add_argument("--doc", help="Process only one doc's chunks")
     ee_p.add_argument("--dry-run", action="store_true")
     ee_p.add_argument("--model", choices=["gemma4", "deepseek", "nemotron"], default="gemma4")
+    gs_p = sub.add_parser("graphrag-search", help="Semantic search + graph traversal (RAG)")
+    gs_p.add_argument("query", help="Search query")
+    gs_p.add_argument("--top-k", type=int, default=10)
+    gs_p.add_argument("--hops", type=int, default=3)
+    hr_p = sub.add_parser("hipporag", help="HippoRAG2-style personalized PageRank retrieval")
+    hr_p.add_argument("query", help="Search query")
+    hr_p.add_argument("--top-k", type=int, default=10)
+    hr_p.add_argument("--hops", type=int, default=3)
 
     # ── governance ────────────────────────────────────────────────────────
     gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")
@@ -135,6 +143,8 @@ def main():
         "verify-commentators": "verify_commentators.py",
         "build-concepts": "build_concepts.py",
         "extract-events": "extract_events.py",
+        "graphrag-search": "graphrag_search.py",
+        "hipporag": "hipporag_retrieve.py",
     }
 
     if args.command == "governance":
