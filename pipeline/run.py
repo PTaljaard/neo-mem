@@ -199,6 +199,10 @@ def main():
                 continue
             if val is None or val is False:
                 continue
+            # Positional 'query' argument for graphrag-search and hipporag
+            if key == "query":
+                script_args.append(str(val))
+                continue
             flag = f"--{key.replace('_', '-')}"
             if val is True:
                 script_args.append(flag)
