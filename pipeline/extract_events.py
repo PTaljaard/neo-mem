@@ -220,16 +220,18 @@ def main():
         """, d=args.doc, limit=args.limit)
         items = [(row["source_id"], row["source_text"], row["doc"], row["source_type"]) for row in r]
 
-        # Also process NewsArticle body text
-        r2 = s.run("""
-            MATCH (n:NewsArticle)
-            WHERE NOT (n)<-[:MENTIONS]-(:Event)
-            AND n.uid IS NOT NULL AND size(n.body) > 100
-            RETURN n.uid AS source_id, n.body AS source_text, n.title AS doc, 'news' AS source_type
-            ORDER BY n.fetched_at DESC
-            LIMIT $limit
-        """, limit=args.limit)
-        items2 = [(row["source_id"], row["source_text"], row["doc"], row["source_type"]) for row in r2]
+        # Also process NewsArticle body text (only if --doc not specified)
+        items2 = []
+        if not args.doc:
+            r2 = s.run("""
+                MATCH (n:NewsArticle)
+                WHERE NOT (n)<-[:MENTIONS]-(:Event)
+                AND n.uid IS NOT NULL AND size(n.body) > 100
+                RETURN n.uid AS source_id, n.body AS source_text, n.title AS doc, 'news' AS source_type
+                ORDER BY n.fetched_at DESC
+                LIMIT $limit
+            """, limit=args.limit)
+            items2 = [(row["source_id"], row["source_text"], row["doc"], row["source_type"]) for row in r2]
         # Merge, preferring news first
         items = items2 + items
 

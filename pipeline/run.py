@@ -79,6 +79,10 @@ def main():
     bc_p.add_argument("--dry-run", action="store_true")
     bc_p.add_argument("--limit", type=int, default=200)
     bc_p.add_argument("--entity-type")
+    ee_p = sub.add_parser("extract-events", help="Extract events from chunks/news (AutoSchemaKG EV+VV)")
+    ee_p.add_argument("--limit", type=int, default=50)
+    ee_p.add_argument("--doc", help="Process only one doc's chunks")
+    ee_p.add_argument("--dry-run", action="store_true")
 
     # ── governance ────────────────────────────────────────────────────────
     gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")
