@@ -83,6 +83,7 @@ def main():
     ee_p.add_argument("--limit", type=int, default=50)
     ee_p.add_argument("--doc", help="Process only one doc's chunks")
     ee_p.add_argument("--dry-run", action="store_true")
+    ee_p.add_argument("--model", choices=["gemma4", "deepseek", "nemotron"], default="gemma4")
 
     # ── governance ────────────────────────────────────────────────────────
     gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")

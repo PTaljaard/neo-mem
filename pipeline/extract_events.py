@@ -77,6 +77,8 @@ Passage context:
 
 def repair_json(raw):
     """Tolerant JSON parser for LLM output."""
+    if raw is None:
+        return {}
     raw = re.sub(r'```(?:json)?\s*', '', raw).strip()
     raw = re.sub(r'\s*```', '', raw)
     s, e = raw.find('{'), raw.rfind('}')
@@ -100,12 +102,12 @@ def event_uid(event_text, chunk_id, idx):
     return f"evt-{chunk_id}-{idx}-{h}"
 
 
-def extract_events_from_chunk(llm, chunk_text, chunk_id):
+def extract_events_from_chunk(llm, chunk_text, chunk_id, model_name):
     """Run EV extraction on one chunk. Returns list of event dicts."""
     prompt = EV_PROMPT.format(text=chunk_text[:8000])
     try:
         resp = llm.chat.completions.create(
-            model=CHAT_MODEL, messages=[{"role": "user", "content": prompt}],
+            model=model_name, messages=[{"role": "user", "content": prompt}],
             temperature=0.1, max_tokens=1024
         )
         data = repair_json(resp.choices[0].message.content)
@@ -124,7 +126,7 @@ def extract_events_from_chunk(llm, chunk_text, chunk_id):
         return []
 
 
-def extract_relations(llm, events, chunk_text, chunk_id):
+def extract_relations(llm, events, chunk_text, chunk_id, model_name):
     """Run VV extraction on a list of events. Returns list of relation dicts."""
     if len(events) < 2:
         return []
@@ -133,7 +135,7 @@ def extract_relations(llm, events, chunk_text, chunk_id):
     prompt = VV_PROMPT.format(events=events_text, text=chunk_text[:4000])
     try:
         resp = llm.chat.completions.create(
-            model=CHAT_MODEL, messages=[{"role": "user", "content": prompt}],
+            model=model_name, messages=[{"role": "user", "content": prompt}],
             temperature=0.1, max_tokens=1024
         )
         data = repair_json(resp.choices[0].message.content)
@@ -203,10 +205,33 @@ def main():
     p.add_argument("--doc", help="Process only chunks from a specific doc UID")
     p.add_argument("--dry-run", action="store_true", help="Count without writing")
     p.add_argument("--batch", type=int, default=5, help="LLM batch size")
+    p.add_argument("--model", default="gemma4", choices=["gemma4", "deepseek", "nemotron"],
+                    help="Model to use for extraction")
     args = p.parse_args()
 
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
-    llm = OpenAI(base_url=OLLAMA_BASE, api_key="ollama")
+    # Model config
+    model_configs = {
+        "gemma4": {"model": CHAT_MODEL, "base_url": OLLAMA_BASE, "api_key": "ollama"},
+        "deepseek": {"model": "deepseek/deepseek-v4-flash", "base_url": "https://openrouter.ai/api/v1", "api_key": ""},
+        "nemotron": {"model": "openrouter/nvidia/nemotron-3.5-lightning:free", "base_url": "https://openrouter.ai/api/v1", "api_key": ""},
+    }
+    # Try to get OpenRouter API key
+    import os
+    or_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not or_key:
+        env_path = Path.home() / ".hermes" / ".env"
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                if "OPENROUTER_API_KEY" in line:
+                    or_key = line.split("=", 1)[1].strip()
+                    break
+    if or_key:
+        model_configs["deepseek"]["api_key"] = or_key
+        model_configs["nemotron"]["api_key"] = or_key
+
+    mc = model_configs[args.model]
+    llm = OpenAI(base_url=mc["base_url"], api_key=mc["api_key"])
 
     # Fetch unprocessed chunks (no Event linked to them)
     doc_filter = "AND c.doc_id = $d" if args.doc else ""
@@ -251,11 +276,11 @@ def main():
         if not source_text or len(source_text.strip()) < 100:
             continue
 
-        events = extract_events_from_chunk(llm, source_text, source_id)
+        events = extract_events_from_chunk(llm, source_text, source_id, mc["model"])
         if not events:
             continue
 
-        relations = extract_relations(llm, events, source_text, source_id)
+        relations = extract_relations(llm, events, source_text, source_id, mc["model"])
 
         # Store
         with n4j.session() as s:
