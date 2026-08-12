@@ -215,6 +215,56 @@ SET updated_at = datetime(),
 // }) SET updated_at = datetime(),
 //     properties = ["uid", "mrn", "name", "dob", "tenant"];
 
+// ── 3b. Meta-Knowledge Base (MKB) — ontology versioning & schema evolution ──
+//
+// These classes track changes to the ontology itself over time.
+// Phase 2 of the ontology governance architecture.
+//
+// OntologyVersion: a point-in-time snapshot of all OntologyClass + Property nodes.
+// SchemaChange: a single evolution event (add/remove/modify class or property).
+// SchemaProposal: a set of proposed changes, reviewed via HITL workflow.
+// RelationshipType: metadata node tracking relationship types used in the graph.
+
+MERGE (:OntologyClass {
+  class_id:   "OntologyVersion",
+  label:      "OntologyVersion",
+  description: "A versioned snapshot of the ontology — captures all OntologyClass and Property definitions at a point in time. Enables rollback, diffing, and audit trail.",
+  extends:    "Root"
+})
+SET updated_at = datetime(),
+    properties = ["version", "created_at", "description", "class_count",
+                  "property_count", "snapshot", "source"];
+
+MERGE (:OntologyClass {
+  class_id:   "SchemaChange",
+  label:      "SchemaChange",
+  description: "A single ontology evolution event — the atomic unit of schema change tracking. Records what changed, when, why, and by whom.",
+  extends:    "Root"
+})
+SET updated_at = datetime(),
+    properties = ["uid", "timestamp", "change_type", "target", "before",
+                  "after", "justification", "proposal_uid", "source", "status"];
+
+MERGE (:OntologyClass {
+  class_id:   "SchemaProposal",
+  label:      "SchemaProposal",
+  description: "A proposed set of schema changes, reviewed by a human (HITL) before being applied. May be auto-generated from extraction pattern analysis or created manually.",
+  extends:    "Root"
+})
+SET updated_at = datetime(),
+    properties = ["uid", "created_at", "status", "proposed_changes",
+                  "evidence", "source", "summary",
+                  "reviewed_by", "reviewed_at", "review_notes"];
+
+MERGE (:OntologyClass {
+  class_id:   "RelationshipType",
+  label:      "RelationshipType",
+  description: "A metadata node tracking a relationship type used in the graph — its description, when it was first observed, and whether it has an ontology-level definition.",
+  extends:    "Root"
+})
+SET updated_at = datetime(),
+    properties = ["type", "description", "created_at", "deprecated"];
+
 // ── 4. PROPERTY DEFINITIONS ─────────────────────────────────────────────────
 
 // Universal properties
@@ -252,10 +302,36 @@ MERGE (:Property {key: "status",        description: "Current status (open, in_p
 MERGE (:Property {key: "due_date",      description: "Deadline or due date",                       datatype: "datetime"});
 MERGE (:Property {key: "assignee",      description: "UID or name of the responsible party",      datatype: "string"});
 
+// Meta-Knowledge Base (MKB) — schema evolution
+MERGE (:Property {key: "version",         description: "Semantic version string (e.g. v1.0, v1.1)", datatype: "string"});
+MERGE (:Property {key: "snapshot",        description: "JSON snapshot of all ontology classes + properties at a version point", datatype: "string"});
+MERGE (:Property {key: "source",          description: "Origin of this node (manual, pipeline, auto-extract, auto)", datatype: "string"});
+MERGE (:Property {key: "change_type",     description: "Type of schema change (ADD_CLASS, REMOVE_CLASS, MODIFY_CLASS, ADD_PROPERTY, ...)", datatype: "string"});
+MERGE (:Property {key: "target",          description: "The class_id or property key this change affects", datatype: "string"});
+MERGE (:Property {key: "before",          description: "JSON representation of the state before the change", datatype: "string"});
+MERGE (:Property {key: "after",           description: "JSON representation of the state after the change", datatype: "string"});
+MERGE (:Property {key: "justification",   description: "Why this schema change was made",            datatype: "string"});
+MERGE (:Property {key: "proposal_uid",    description: "Link to the SchemaProposal that triggered this change", datatype: "string"});
+MERGE (:Property {key: "proposed_changes", description: "JSON array of change objects proposed in a SchemaProposal", datatype: "string"});
+MERGE (:Property {key: "evidence",        description: "JSON object with extraction pattern evidence supporting a proposal", datatype: "string"});
+MERGE (:Property {key: "summary",         description: "Short human-readable summary of the proposal's changes", datatype: "string"});
+MERGE (:Property {key: "reviewed_by",     description: "Name or identifier of the HITL reviewer",   datatype: "string"});
+MERGE (:Property {key: "reviewed_at",     description: "Timestamp when the HITL review occurred",   datatype: "datetime"});
+MERGE (:Property {key: "review_notes",    description: "Free-text notes from the HITL reviewer",    datatype: "string"});
+MERGE (:Property {key: "class_count",     description: "Number of OntologyClass nodes in a version snapshot", datatype: "integer"});
+MERGE (:Property {key: "property_count",  description: "Number of Property nodes in a version snapshot", datatype: "integer"});
+MERGE (:Property {key: "deprecated",      description: "Boolean flag — true if this node is deprecated", datatype: "boolean"});
+MERGE (:Property {key: "deprecated_at",   description: "Timestamp when this node was deprecated",   datatype: "datetime"});
+
 // ── 5. RELATIONSHIP TYPES (schema hints for the graph model) ─────────────────
 //
 // The following relationships are created as semantic links between example nodes.
 // They are not stored as nodes themselves — they are actual Neo4j relationships.
+
+// Meta-Knowledge Base (MKB) relationships
+// (:SchemaProposal)-[:TRIGGERED]->(:SchemaChange) — which proposal caused this change
+// (:SchemaChange)-[:UPDATED_CLASS]->(:OntologyClass) — which class was changed
+// (:SchemaChange)-[:UPDATED_PROPERTY]->(:Property) — which property was changed
 
 // ── 6. EXAMPLE DATA ─────────────────────────────────────────────────────────
 

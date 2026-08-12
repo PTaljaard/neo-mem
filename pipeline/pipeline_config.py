@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 # ── Neo4j ──────────────────────────────────────────────────────────────
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://192.168.0.114:7687")
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://192.168.1.20:7687")
 NEO4J_USER = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASS = os.getenv("NEO4J_PASSWORD", "Erna#26neo4j")
 NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")

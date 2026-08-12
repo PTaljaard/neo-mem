@@ -82,6 +82,33 @@ def main():
     gov_p.add_argument("--uid", help="Fact UID (for approve/reject)")
     gov_p.add_argument("--notes", "-n", default="", help="Notes for approve/reject")
     gov_p.add_argument("--reason", "-r", default="", help="Reason for reject")
+
+    # ── meta-kb ────────────────────────────────────────────────────────────
+    mk_p = sub.add_parser("meta-kb", help="Meta-Knowledge Base (Phase 2) — ontology versioning & schema evolution")
+    mk_p.add_argument("action", choices=[
+        "init", "snapshot", "history", "diff",
+        "propose", "review", "show", "approve", "reject",
+        "analyze", "schema-history",
+    ])
+    mk_p.add_argument("--uid", help="Proposal UID (for approve/reject/show)")
+    mk_p.add_argument("--v1", help="First version for diff")
+    mk_p.add_argument("--v2", help="Second version for diff")
+    mk_p.add_argument("--file", "-f", help="JSON file with proposed changes")
+    mk_p.add_argument("--source", "-s", default=None,
+                      choices=["manual", "pipeline", "auto-extract"],
+                      help="Source of the proposal")
+    mk_p.add_argument("--analyze", action="store_true",
+                      help="Auto-analyze extraction patterns")
+    mk_p.add_argument("--apply", action="store_true",
+                      help="Auto-approve (skip HITL)")
+    mk_p.add_argument("--reviewer", default=None, help="Reviewer name")
+    mk_p.add_argument("--notes", "-n", default=None, help="Review notes")
+    mk_p.add_argument("--reason", default=None, help="Rejection reason")
+    mk_p.add_argument("--description", "-d", default=None, help="Version description")
+    mk_p.add_argument("--limit", type=int, default=None, help="Max results")
+    mk_p.add_argument("--auto-propose", action="store_true",
+                      help="Auto-create proposals from analysis")
+
     sub.add_parser("help", help="Show this help")
 
     args = p.parse_args()
@@ -108,6 +135,33 @@ def main():
         if args.reason:
             script_args.extend(["--reason", args.reason])
         run_script("governance.py", script_args)
+    elif args.command == "meta-kb":
+        script_args = [args.action]
+        if args.uid:
+            script_args.extend(["--uid", args.uid])
+        if args.v1 and args.v2:
+            script_args.extend([args.v1, args.v2])
+        if args.file:
+            script_args.extend(["--file", args.file])
+        if args.source:
+            script_args.extend(["--source", args.source])
+        if args.analyze:
+            script_args.append("--analyze")
+        if args.apply:
+            script_args.append("--apply")
+        if args.reviewer:
+            script_args.extend(["--reviewer", args.reviewer])
+        if args.notes:
+            script_args.extend(["--notes", args.notes])
+        if args.reason:
+            script_args.extend(["--reason", args.reason])
+        if args.description:
+            script_args.extend(["--description", args.description])
+        if args.limit:
+            script_args.extend(["--limit", str(args.limit)])
+        if args.auto_propose:
+            script_args.append("--auto-propose")
+        run_script("meta_kb.py", script_args)
     elif args.command == "help":
         p.print_help()
         sys.exit(0)

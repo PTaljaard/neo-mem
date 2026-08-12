@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Add multi-dimensional confidence to Fact and NewsArticle nodes."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS
 from neo4j import GraphDatabase
-
-NEO4J_URI = "bolt://192.168.0.114:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASS = "Erna#26neo4j"
 
 n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
