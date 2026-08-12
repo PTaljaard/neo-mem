@@ -207,6 +207,8 @@ def main():
     p.add_argument("--batch", type=int, default=5, help="LLM batch size")
     p.add_argument("--model", default="gemma4", choices=["gemma4", "deepseek", "nemotron"],
                     help="Model to use for extraction")
+    p.add_argument("--force", action="store_true",
+                    help="Re-process sources that already have events (deletes stale events first)")
     args = p.parse_args()
 
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
@@ -233,13 +235,13 @@ def main():
     mc = model_configs[args.model]
     llm = OpenAI(base_url=mc["base_url"], api_key=mc["api_key"])
 
-    # Fetch unprocessed chunks (no Event linked to them)
+    # Fetch unprocessed chunks (no Event linked to them, unless --force)
+    events_filter = "" if args.force else "AND NOT (c)<-[:MENTIONS]-(:Event)"
     doc_filter = "AND c.doc_id = $d" if args.doc else ""
     with n4j.session() as s:
         r = s.run(f"""
             MATCH (c:Chunk)
-            WHERE NOT (c)<-[:MENTIONS]-(:Event) {doc_filter}
-            AND c.uid IS NOT NULL AND size(c.text) > 100
+            WHERE c.uid IS NOT NULL AND size(c.text) > 100 {events_filter} {doc_filter}
             RETURN c.uid AS source_id, c.text AS source_text, c.doc_id AS doc, 'chunk' AS source_type
             LIMIT $limit
         """, d=args.doc, limit=args.limit)
@@ -248,17 +250,17 @@ def main():
         # Also process NewsArticle body text (only if --doc not specified)
         items2 = []
         if not args.doc:
-            r2 = s.run("""
+            news_filter = "" if args.force else "AND NOT (n)<-[:MENTIONS]-(:Event)"
+            r2 = s.run(f"""
                 MATCH (n:NewsArticle)
-                WHERE NOT (n)<-[:MENTIONS]-(:Event)
-                AND n.uid IS NOT NULL AND size(n.body) > 100
+                WHERE n.uid IS NOT NULL AND size(n.body) > 100 {news_filter}
                 RETURN n.uid AS source_id, n.body AS source_text, n.title AS doc, 'news' AS source_type
                 ORDER BY n.fetched_at DESC
                 LIMIT $limit
             """, limit=args.limit)
             items2 = [(row["source_id"], row["source_text"], row["doc"], row["source_type"]) for row in r2]
-        # Merge, preferring news first
-        items = items2 + items
+    # Merge, preferring news first
+    items = items2 + items
 
     log(f"🔍 Found {len(items)} sources to process for events ({len(items2)} news, {len(items) - len(items2)} chunks)")
     # Also update the store function to handle NewsArticle linking
