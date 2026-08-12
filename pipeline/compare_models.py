@@ -80,7 +80,7 @@ def main():
             "api_key": "ollama",
         },
         "nemotron": {
-            "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+            "model": "openrouter/nvidia/nemotron-3.5-lightning:free",
             "base_url": "https://openrouter.ai/api/v1",
             "api_key": "",  # Will be read from env
         },
