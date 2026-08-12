@@ -75,6 +75,7 @@ def main():
     sub.add_parser("verify-claims", help="Verify Claim node structure")
     sub.add_parser("verify-commentators", help="Verify commentator graph")
     sub.add_parser("list-tasks", help="List kanban tasks for the PhD pipeline")
+    sub.add_parser("build-concepts", help="Build concept hierarchy from entities (AutoSchemaKG-inspired)")
 
     # ── governance ────────────────────────────────────────────────────────
     gov_p = sub.add_parser("governance", help="Governance Adjudication (Phase 1)")
@@ -124,6 +125,7 @@ def main():
         "add-confidence-schema": "add_confidence_schema.py",
         "verify-claims": "verify_claims.py",
         "verify-commentators": "verify_commentators.py",
+        "build-concepts": "build_concepts.py",
     }
 
     if args.command == "governance":
