@@ -129,6 +129,7 @@ def main():
         "verify-claims": "verify_claims.py",
         "verify-commentators": "verify_commentators.py",
         "build-concepts": "build_concepts.py",
+        "extract-events": "extract_events.py",
     }
 
     if args.command == "governance":
