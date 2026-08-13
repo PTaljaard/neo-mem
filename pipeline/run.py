@@ -88,6 +88,13 @@ def main():
     gs_p.add_argument("query", help="Search query")
     gs_p.add_argument("--top-k", type=int, default=10)
     gs_p.add_argument("--hops", type=int, default=3)
+    ce_p = sub.add_parser("classify-events", help="Classify events by topic (Option B+C)")
+    ce_p.add_argument("action", choices=["classify", "seed", "topics", "review", "approve", "reject"],
+                      nargs="?", default="classify", help="Action to perform")
+    ce_p.add_argument("--dry-run", action="store_true")
+    ce_p.add_argument("--model", choices=["gemma4", "deepseek"], default="deepseek")
+    ce_p.add_argument("--batch-size", type=int, default=10)
+    ce_p.add_argument("topic", nargs="?", help="Topic name for approve/reject")
     hr_p = sub.add_parser("hipporag", help="HippoRAG2-style personalized PageRank retrieval")
     hr_p.add_argument("query", help="Search query")
     hr_p.add_argument("--top-k", type=int, default=10)
