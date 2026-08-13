@@ -152,6 +152,7 @@ def main():
         "extract-events": "extract_events.py",
         "graphrag-search": "graphrag_search.py",
         "hipporag": "hipporag_retrieve.py",
+        "classify-events": "classify_events.py",
     }
 
     if args.command == "governance":
@@ -201,6 +202,8 @@ def main():
     if args.command in script_map:
         # Build the CLI args for the target script
         script_args = []
+        # Collect positional args and flags separately
+        positional_args = []
         for key, val in vars(args).items():
             if key == "command":
                 continue
@@ -208,13 +211,24 @@ def main():
                 continue
             # Positional 'query' argument for graphrag-search and hipporag
             if key == "query":
-                script_args.append(str(val))
+                positional_args.append(str(val))
+                continue
+            # Positional 'action' and 'topic' for classify-events
+            if key == "action":
+                if val:
+                    positional_args.append(str(val))
+                continue
+            if key == "topic":
+                if val:
+                    positional_args.append(str(val))
                 continue
             flag = f"--{key.replace('_', '-')}"
             if val is True:
                 script_args.append(flag)
             else:
                 script_args.extend([flag, str(val)])
+        # Flags first, then positional args (some scripts expect flags before subcommand)
+        script_args.extend(positional_args)
         run_script(script_map[args.command], script_args)
     else:
         p.print_help()

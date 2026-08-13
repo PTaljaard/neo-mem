@@ -354,15 +354,19 @@ def reject_topic(n4j, topic_name):
 
 def main():
     p = argparse.ArgumentParser(description="Topic classification for Event nodes")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--model", choices=["gemma4", "deepseek"], default="deepseek")
+    p.add_argument("--batch-size", type=int, default=10)
+    p.add_argument("--api-key", help="OpenRouter API key (or set OPENROUTER_API_KEY)")
     sub = p.add_subparsers(dest="command", required=True)
     
     sub.add_parser("seed", help="Create seed topics in Neo4j")
     
     clf = sub.add_parser("classify", help="Classify unclassified events")
-    clf.add_argument("--dry-run", action="store_true")
-    clf.add_argument("--model", choices=["gemma4", "deepseek"], default="deepseek")
-    clf.add_argument("--batch-size", type=int, default=10)
-    clf.add_argument("--api-key", help="OpenRouter API key (or set OPENROUTER_API_KEY)")
+    clf.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
+    clf.add_argument("--model", choices=["gemma4", "deepseek"], default="deepseek", help=argparse.SUPPRESS)
+    clf.add_argument("--batch-size", type=int, default=10, help=argparse.SUPPRESS)
+    clf.add_argument("--api-key", help=argparse.SUPPRESS)
     
     sub.add_parser("topics", help="List all topics with event counts")
     sub.add_parser("review", help="List topics pending HITL review")
