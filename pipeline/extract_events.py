@@ -28,14 +28,29 @@
 # No re-ingestion needed — reads existing chunks from Neo4j.
 """
 
-import sys, json, datetime, time, re, hashlib, argparse
+import sys, json, datetime, time, re, hashlib, argparse, random
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, OLLAMA_BASE, CHAT_MODEL
+from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, OLLAMA_BASE, CHAT_MODEL, CHAT_BASE
 from neo4j import GraphDatabase
 from openai import OpenAI
 
 log = print
+
+# ── Retry helper with exponential backoff for OmniRoute 503/429 ──────────
+def call_with_backoff(llm, messages, max_retries=5, model="model"):
+    """Call LLM with exponential backoff on 503/429 (rate limit)."""
+    for attempt in range(max_retries):
+        try:
+            return llm.chat.completions.create(model=model, messages=messages, temperature=0.1, max_tokens=512)
+        except Exception as e:
+            if "503" in str(e) or "429" in str(e):
+                wait = (2 ** attempt) + random.uniform(0, 1)
+                log(f"  ⚠️ Rate limited ({e.__class__.__name__}), waiting {wait:.1f}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"Max retries ({max_retries}) exceeded for {model}")
 
 # ── Entity-Event (EV) prompt ──────────────────────────────────────────
 # Ref: AutoSchemaKG triple_extraction_prompt.py — event_entity section
@@ -106,10 +121,7 @@ def extract_events_from_chunk(llm, chunk_text, chunk_id, model_name):
     """Run EV extraction on one chunk. Returns list of event dicts."""
     prompt = EV_PROMPT.format(text=chunk_text[:8000])
     try:
-        resp = llm.chat.completions.create(
-            model=model_name, messages=[{"role": "user", "content": prompt}],
-            temperature=0.1, max_tokens=1024
-        )
+        resp = call_with_backoff(llm, [{"role": "user", "content": prompt}], model=model_name)
         data = repair_json(resp.choices[0].message.content)
         events = data.get("events", [])
         # Validate
@@ -134,10 +146,7 @@ def extract_relations(llm, events, chunk_text, chunk_id, model_name):
     events_text = "\n".join(f"{i+1}. {e['event']}" for i, e in enumerate(events))
     prompt = VV_PROMPT.format(events=events_text, text=chunk_text[:4000])
     try:
-        resp = llm.chat.completions.create(
-            model=model_name, messages=[{"role": "user", "content": prompt}],
-            temperature=0.1, max_tokens=1024
-        )
+        resp = call_with_backoff(llm, [{"role": "user", "content": prompt}], model=model_name)
         data = repair_json(resp.choices[0].message.content)
         relations = data.get("relations", [])
         # Validate
@@ -205,7 +214,7 @@ def main():
     p.add_argument("--doc", help="Process only chunks from a specific doc UID")
     p.add_argument("--dry-run", action="store_true", help="Count without writing")
     p.add_argument("--batch", type=int, default=5, help="LLM batch size")
-    p.add_argument("--model", default="gemma4", choices=["gemma4", "deepseek", "nemotron"],
+    p.add_argument("--model", default="gemma4", choices=["gemma4", "deepseek", "nemotron", "gemma4-free"],
                     help="Model to use for extraction")
     p.add_argument("--force", action="store_true",
                     help="Re-process sources that already have events (deletes stale events first)")
@@ -214,9 +223,10 @@ def main():
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     # Model config
     model_configs = {
-        "gemma4": {"model": CHAT_MODEL, "base_url": OLLAMA_BASE, "api_key": "ollama"},
+        "gemma4": {"model": CHAT_MODEL, "base_url": CHAT_BASE, "api_key": "ollama"},
         "deepseek": {"model": "deepseek/deepseek-v4-flash", "base_url": "https://openrouter.ai/api/v1", "api_key": ""},
-        "nemotron": {"model": "openrouter/nvidia/nemotron-3.5-lightning:free", "base_url": "https://openrouter.ai/api/v1", "api_key": ""},
+        "nemotron": {"model": "oc/nemotron-3-ultra-free", "base_url": CHAT_BASE, "api_key": "ollama"},
+        "gemma4-free": {"model": "auto/best-free", "base_url": CHAT_BASE, "api_key": "ollama"},
     }
     # Try to get OpenRouter API key
     import os
@@ -231,6 +241,7 @@ def main():
     if or_key:
         model_configs["deepseek"]["api_key"] = or_key
         model_configs["nemotron"]["api_key"] = or_key
+        model_configs["gemma4-free"]["api_key"] = or_key
 
     mc = model_configs[args.model]
     llm = OpenAI(base_url=mc["base_url"], api_key=mc["api_key"])
@@ -280,6 +291,7 @@ def main():
 
         events = extract_events_from_chunk(llm, source_text, source_id, mc["model"])
         if not events:
+            log(f"  ⏭️ {source_id[:30]:30s} skipped (no events found)")
             continue
 
         relations = extract_relations(llm, events, source_text, source_id, mc["model"])

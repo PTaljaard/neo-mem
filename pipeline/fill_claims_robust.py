@@ -4,11 +4,11 @@ import re, json, time
 from neo4j import GraphDatabase
 from openai import OpenAI
 
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-CHAT_MODEL = "gemma4:e4b-it-qat"
-CHAT_BASE = "http://192.168.0.200:11434/v1"
+CHAT_MODEL = "oc/nemotron-3-ultra-free"
+CHAT_BASE = "http://localhost:20128/v1"
 CLAIM_COUNT = 3
 
 def repair_json(raw):

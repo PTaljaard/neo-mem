@@ -9,10 +9,10 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("ingest-dialkg")
 
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-EMBED_MODEL = "nomic-embed-text"
+EMBED_MODEL = "mxbai-embed-large"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
 PDF_PATH = "C:\\Users\\ptalj\\AppData\\Local\\Temp\\2603.20059.pdf"
 PAPER_TITLE = "DIAL-KG: Schema-Free Incremental Knowledge Graph Construction via Dynamic Schema Induction and Evolution-Intent Assessment"

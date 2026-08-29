@@ -5,8 +5,8 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 import re, json
 
-n4j = GraphDatabase.driver("bolt://192.168.0.114:7687", auth=("neo4j", "Erna#26neo4j"))
-llm = OpenAI(base_url="http://192.168.0.200:11434/v1", api_key="ollama")
+n4j = GraphDatabase.driver("bolt://192.168.1.20:7687", auth=("neo4j", "Erna#26neo4j"))
+llm = OpenAI(base_url="http://localhost:20128/v1", api_key="ollama")
 
 with n4j.session() as s:
     r = s.run("""
@@ -29,7 +29,7 @@ Keep claims SHORT (under 20 words). Return ONLY valid JSON. No markdown, no code
 Article: {body}"""
 
         resp = llm.chat.completions.create(
-            model="gemma4:e4b-it-qat",
+            model="oc/nemotron-3-ultra-free",
             messages=[{"role":"user","content":prompt}],
             temperature=0.1, max_tokens=512
         )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Save the Amber heat claims to Neo4j as Claim nodes."""
 from neo4j import GraphDatabase
-n4j = GraphDatabase.driver("bolt://192.168.0.114:7687", auth=("neo4j", "Erna#26neo4j"))
+n4j = GraphDatabase.driver("bolt://192.168.1.20:7687", auth=("neo4j", "Erna#26neo4j"))
 with n4j.session() as s:
     r = s.run("MATCH (n:NewsArticle) WHERE size(n.body) > 100 AND (n.claim_count IS NULL OR n.claim_count = 0) RETURN n.uid, n.title LIMIT 1")
     row = r.single()

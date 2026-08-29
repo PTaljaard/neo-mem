@@ -16,7 +16,7 @@ Usage:
 import sys, json, argparse, datetime, re
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, OLLAMA_BASE
+from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, CHAT_BASE
 from neo4j import GraphDatabase
 from openai import OpenAI
 
@@ -71,7 +71,7 @@ Rules:
 """
     try:
         resp = llm.chat.completions.create(
-            model="gemma4:e4b-it-qat",
+            model="oc/nemotron-3-ultra-free",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1, max_tokens=512
         )
@@ -224,7 +224,7 @@ def main():
 
     args = p.parse_args()
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
-    llm = OpenAI(base_url=OLLAMA_BASE, api_key="ollama")
+    llm = OpenAI(base_url=CHAT_BASE, api_key="ollama")
 
     if args.command == "init":
         add_governance_fields(n4j)

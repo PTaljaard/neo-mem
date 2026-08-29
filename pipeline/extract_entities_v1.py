@@ -7,14 +7,14 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("extract-entities")
 
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 DOC_UID = "dial-kg-2603.20059"
 
 # LLM for extraction
-OLLAMA_BASE = "http://192.168.0.200:11434/v1"
-EXTRACT_MODEL = "gemma4:e4b-it-qat"
+OLLAMA_BASE = "http://localhost:20128/v1"
+EXTRACT_MODEL = "oc/nemotron-3-ultra-free"
 
 def get_chunks(n4j):
     """Get all chunks for the document."""

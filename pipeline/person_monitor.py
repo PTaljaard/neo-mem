@@ -10,13 +10,13 @@ import os, sys, json, uuid, hashlib, argparse, datetime, time, re
 from neo4j import GraphDatabase
 from openai import OpenAI
 
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-EMBED_MODEL = "nomic-embed-text"
+EMBED_MODEL = "mxbai-embed-large"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
-CHAT_MODEL = "gemma4:e4b-it-qat"
-CHAT_BASE = "http://192.168.0.200:11434/v1"
+CHAT_MODEL = "oc/nemotron-3-ultra-free"   # Via OmniRoute
+CHAT_BASE = "http://localhost:20128/v1"
 
 log = print
 
@@ -180,6 +180,7 @@ def main():
 
     log(f"🔍 Monitoring: {args.person} (last {args.days} days)")
     emb = OpenAI(api_key="ollama", base_url=EMBED_BASE)
+    llm = OpenAI(api_key="ollama", base_url=CHAT_BASE)   # OmniRoute chat for claims
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
     articles = search_commentary(args.person, args.days)
@@ -188,7 +189,7 @@ def main():
     stored = 0
     for article in articles:
         text = f"{article['title']}. {article['description']}"
-        claims, confs = extract_claims(text, emb, args.claims)
+        claims, confs = extract_claims(text, llm, args.claims)
         if store_in_neo4j(n4j, emb, article, claims, confs, args.dry_run):
             stored += 1
         time.sleep(1)  # Rate limit

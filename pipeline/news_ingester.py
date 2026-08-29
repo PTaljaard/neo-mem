@@ -21,13 +21,13 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-EMBED_MODEL = "nomic-embed-text"
+EMBED_MODEL = "mxbai-embed-large"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
-CHAT_MODEL = "gemma4:e4b-it-qat"   # For claim extraction
-CHAT_BASE = "http://192.168.0.200:11434/v1"
+CHAT_MODEL = "oc/nemotron-3-ultra-free"   # Via OmniRoute (free, auto-fallback)
+CHAT_BASE = "http://localhost:20128/v1"
 FIRECRAWL_KEY = "fc-cceb0426298f473bb8cef0a512924bab"
 FIRECRAWL_URL = "https://api.firecrawl.dev/v1/scrape"
 
@@ -186,7 +186,7 @@ Article text:
     return [], []
 
 
-def ingest_articles(articles, emb_client, neo4j_driver, use_firecrawl=True, claim_count=3):
+def ingest_articles(articles, emb_client, neo4j_driver, llm=None, use_firecrawl=True, claim_count=3):
     """Store news articles in Neo4j with embeddings and claim extraction.
     If use_firecrawl=True, fetches full article text for better embeddings.
     claim_count: number of claims to extract per article (default 3)."""
@@ -234,8 +234,8 @@ def ingest_articles(articles, emb_client, neo4j_driver, use_firecrawl=True, clai
             log(f"  ⚠️ Embedding failed for {title[:50]}: {e}")
             embedding = []
 
-        # Extract claims
-        claims_texts, claims_confs = extract_claims(body or f"{title}. {summary}", emb_client, claim_count)
+        # Extract claims (uses dedicated chat client, falling back to emb client if none)
+        claims_texts, claims_confs = extract_claims(body or f"{title}. {summary}", llm or emb_client, claim_count)
         
         # Create node with claims as separate Claim nodes
         with neo4j_driver.session() as session:
@@ -306,6 +306,7 @@ def main():
         log(f"  🔥 Firecrawl: enabled (free tier: 500/mo, using ~{args.max_articles}/day = ~{args.max_articles*30}/mo)")
 
     emb = OpenAI(api_key="ollama", base_url=EMBED_BASE)
+    llm = OpenAI(api_key="ollama", base_url=CHAT_BASE)   # OmniRoute chat for claim extraction
     neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     create_index(neo4j)
 
@@ -319,7 +320,7 @@ def main():
         return
 
     log("  Ingesting to Neo4j..." + (" (with Firecrawl full text)" if use_fc else " (headlines only)"))
-    added, skipped, fc_ok, fc_fail = ingest_articles(articles, emb, neo4j, use_firecrawl=use_fc, claim_count=args.claims)
+    added, skipped, fc_ok, fc_fail = ingest_articles(articles, emb, neo4j, llm=llm, use_firecrawl=use_fc, claim_count=args.claims)
 
     log(f"\n  ✅ Added: {added} new articles")
     log(f"  ⏭️  Skipped (duplicates): {skipped}")

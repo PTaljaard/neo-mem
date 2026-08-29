@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Rabust entity/fact extraction from Neo4j chunks using LLM with retry & JSON repair."""
-import os, sys, uuid, logging, json, re, time
+import os, sys, uuid, logging, json, re, time, random
 from neo4j import GraphDatabase
 from openai import OpenAI
 
@@ -8,12 +8,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("extract-robust")
 
 # ── Config ────────────────────────────────────────────────────────────
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 DOC_UID = "dial-kg-2603.20059"
-OLLAMA_BASE = "http://192.168.0.200:11434/v1"
-EXTRACT_MODEL = "gemma4:e4b-it-qat"
+OLLAMA_BASE = "http://localhost:20128/v1"
+EXTRACT_MODEL = "oc/nemotron-3-ultra-free"
 MAX_RETRIES = 3
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -43,6 +43,21 @@ def repair_json(raw: str) -> dict:
     except json.JSONDecodeError:
         return {"entities": [], "facts": []}
 
+# ── Retry helper with exponential backoff for OmniRoute 503/429 ──────────
+def call_with_backoff(llm, messages, max_retries=5, model="model"):
+    """Call LLM with exponential backoff on 503/429 (rate limit)."""
+    for attempt in range(max_retries):
+        try:
+            return llm.chat.completions.create(model=model, messages=messages, temperature=0.1, max_tokens=1024)
+        except Exception as e:
+            if "503" in str(e) or "429" in str(e):
+                wait = (2 ** attempt) + random.uniform(0, 1)
+                log(f"  ⚠️ Rate limited ({e.__class__.__name__}), waiting {wait:.1f}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"Max retries ({max_retries}) exceeded for {model}")
+
 def extract_entities_and_facts(llm, text, retries=MAX_RETRIES):
     """Extract with retry on failure."""
     prompt = f"""Extract entities and facts from this text about the DIAL-KG paper.
@@ -63,11 +78,7 @@ Text:
 
     for attempt in range(retries):
         try:
-            resp = llm.chat.completions.create(
-                model=EXTRACT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1, max_tokens=1024
-            )
+            resp = call_with_backoff(llm, [{"role": "user", "content": prompt}], model=EXTRACT_MODEL)
             content = resp.choices[0].message.content.strip()
             data = repair_json(content)
             if "entities" in data and "facts" in data:

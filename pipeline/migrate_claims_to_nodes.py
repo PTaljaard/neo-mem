@@ -3,7 +3,7 @@
 Also adds NewsArticle and Claim to the ontology class hierarchy."""
 from neo4j import GraphDatabase
 
-NEO4J_URI = "bolt://192.168.0.114:7687"
+NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 

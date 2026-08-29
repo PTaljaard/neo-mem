@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Query Neo4j for today's news articles with their Claim sub-nodes."""
 from neo4j import GraphDatabase
-n4j = GraphDatabase.driver("bolt://192.168.0.114:7687", auth=("neo4j", "Erna#26neo4j"))
+n4j = GraphDatabase.driver("bolt://192.168.1.20:7687", auth=("neo4j", "Erna#26neo4j"))
 with n4j.session() as s:
     r = s.run("""
         MATCH (n:NewsArticle)

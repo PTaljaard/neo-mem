@@ -17,7 +17,7 @@ Usage:
 import sys, json, argparse, time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, OLLAMA_BASE, CHAT_MODEL
+from pipeline_config import NEO4J_URI, NEO4J_USER, NEO4J_PASS, OLLAMA_BASE, CHAT_MODEL, CHAT_BASE
 from neo4j import GraphDatabase
 from openai import OpenAI
 
@@ -97,7 +97,7 @@ def get_or_key():
 def get_llm(model="gemma4", api_key_override=""):
     """Get LLM client for the specified model."""
     if model == "gemma4":
-        return OpenAI(base_url=OLLAMA_BASE, api_key="ollama")
+        return OpenAI(base_url=CHAT_BASE, api_key="ollama")
     elif model == "deepseek":
         key = api_key_override or get_or_key()
         if not key:
