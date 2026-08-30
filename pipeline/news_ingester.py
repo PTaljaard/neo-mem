@@ -31,6 +31,21 @@ CHAT_BASE = "http://localhost:20128/v1"
 FIRECRAWL_KEY = "fc-cceb0426298f473bb8cef0a512924bab"
 FIRECRAWL_URL = "https://api.firecrawl.dev/v1/scrape"
 
+# Futures-studies scenario universe. Scenario identity in Neo4j == name.
+# Must match the 10 :Scenario nodes already in the graph.
+KNOWN_SCENARIOS = [
+    "Fiscal Stabilization",
+    "Fiscal Deterioration",
+    "Energy Recovery",
+    "Energy Crisis Deepens",
+    "GNU Stability",
+    "GNU Fragility",
+    "Economic Growth",
+    "Economic Stagnation",
+    "Technology Acceleration",
+    "Technology Disruption",
+]
+
 log = print
 
 RSS_FEEDS = {
@@ -186,7 +201,94 @@ Article text:
     return [], []
 
 
-def ingest_articles(articles, emb_client, neo4j_driver, llm=None, use_firecrawl=True, claim_count=3):
+def _slugify(name):
+    """Lowercase, hyphenated slug for author_uid, e.g. 'Frans Cronje' -> 'frans-cronje'."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    return slug
+
+
+def classify_claims_against_scenarios(claim_texts, llm):
+    """Classify a list of claims against the KNOWN_SCENARIOS universe.
+
+    Returns a list of tuples: (claim_index, scenario_name, relationship)
+    where relationship is "SUPPORTS" or "WEAKENS". claim_index is the index
+    into `claim_texts`. Scenarios are matched (case-insensitively, fuzzy)
+    against KNOWN_SCENARIOS so we only ever link to existing :Scenario nodes.
+    Error-tolerant: on LLM failure, logs a warning and returns [].
+    """
+    if not claim_texts or llm is None:
+        return []
+    prompt = f"""Classify these claims against the known scenario universe.
+
+Known scenarios:
+{chr(10).join(f"- {s}" for s in KNOWN_SCENARIOS)}
+
+For each claim, decide whether it SUPPORTS or WEAKENS any of the known scenarios,
+or NONE if it does not bear on any. Match scenario names EXACTLY to the list above.
+
+Return ONLY valid JSON:
+{{"classifications": [{{"claim_index": 0, "scenario": "Scenario Name", "relationship": "SUPPORTS"}}]}}
+
+Rules:
+- claim_index is the position (0-based) of the claim in the input list
+- "scenario" must be one of the known scenario names verbatim, or null if NONE
+- "relationship" is exactly "SUPPORTS" or "WEAKENS" (only when scenario is set)
+
+Claims:
+{chr(10).join(f"{i}: {t[:500]}" for i, t in enumerate(claim_texts))}"""
+
+    try:
+        resp = llm.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1, max_tokens=600
+        )
+        content = resp.choices[0].message.content.strip()
+        content = re.sub(r"```(?:json)?\s*", "", content).strip()
+        # Robust JSON parse: try full content first, then first JSON object only,
+        # so concatenated/markdown-wrapped objects don't cause "Extra data".
+        data = None
+        try:
+            data = json.loads(content)
+        except Exception:
+            # Fall back to extracting the FIRST balanced {...} object
+            start = content.find("{")
+            if start >= 0:
+                depth = 0
+                for i in range(start, len(content)):
+                    if content[i] == "{":
+                        depth += 1
+                    elif content[i] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            data = json.loads(content[start:i + 1])
+                            break
+        if not isinstance(data, dict):
+            raise ValueError("no JSON object in LLM response")
+        results = []
+        valid_scenarios = set(KNOWN_SCENARIOS)
+        valid_scenarios_lower = {s.lower(): s for s in KNOWN_SCENARIOS}
+        for item in data.get("classifications", []):
+            if not isinstance(item, dict):
+                continue
+            idx = item.get("claim_index")
+            scen = item.get("scenario")
+            rel = item.get("relationship", "SUPPORTS")
+            if idx is None or not isinstance(idx, int) or idx < 0 or idx >= len(claim_texts):
+                continue
+            if scen:
+                # Match verbatim, else case-insensitively against known list.
+                if scen not in valid_scenarios:
+                    scen = valid_scenarios_lower.get(str(scen).lower())
+                if scen:
+                    results.append((idx, scen, rel if rel in ("SUPPORTS", "WEAKENS") else "SUPPORTS"))
+        return results
+    except Exception as e:
+        log(f"  ⚠️ Scenario classification failed: {e}")
+        return []
+
+
+def ingest_articles(articles, emb_client, neo4j_driver, llm=None, use_firecrawl=True, claim_count=3, author_name=None):
     """Store news articles in Neo4j with embeddings and claim extraction.
     If use_firecrawl=True, fetches full article text for better embeddings.
     claim_count: number of claims to extract per article (default 3)."""
@@ -272,6 +374,43 @@ def ingest_articles(articles, emb_client, neo4j_driver, llm=None, use_firecrawl=
                     MATCH (n:NewsArticle {uid: $nu}), (c:Claim {uid: $cu})
                     MERGE (n)-[:CONTAINS_CLAIM]->(c)
                 """, nu=uid, cu=cuid)
+
+            # ── Claim → Scenario wiring + author attribution ─────────────────
+            # Opportunistic: only when an LLM classifier is available. Never
+            # crashes ingest — errors are logged and skipped.
+            if llm is not None and claims_texts:
+                try:
+                    classified = classify_claims_against_scenarios(claims_texts, llm)
+                    linked_scenario_names = set()
+                    article_claim_uids = [f"{uid}-c{i}" for i in range(len(claims_texts))]
+                    for ci, scen_name, rel in classified:
+                        cuid = article_claim_uids[ci]
+                        # MERGE scenario by name (futures-studies identity == name).
+                        # Never overwrite an existing author.
+                        session.run("""
+                            MERGE (sc:Scenario {name: $sname})
+                            WITH sc
+                            MATCH (c:Claim {uid: $cuid})
+                            MERGE (c)-[:%(REL)s]->(sc)
+                        """ % {"REL": rel}, sname=scen_name, cuid=cuid)
+                        linked_scenario_names.add(scen_name)
+                    # Author attribution: MERGE person, link AUTHORED to each
+                    # scenario connected to this article's claims.
+                    if linked_scenario_names and author_name:
+                        person_slug = _slugify(author_name)
+                        MERGE_PERSON = f"""
+                            MERGE (p:Person {{name: $pname}})
+                            SET p.role = CASE WHEN p.role IS NULL THEN 'Commentator' ELSE p.role END
+                            WITH p
+                            UNWIND $scn_names AS sname
+                            MERGE (sc:Scenario {{name: sname}})
+                            MERGE (p)-[:AUTHORED]->(sc)
+                            SET sc.author_uid = CASE WHEN sc.author_uid IS NULL THEN $slug ELSE sc.author_uid END
+                        """
+                        session.run(MERGE_PERSON, pname=author_name,
+                                    scn_names=sorted(linked_scenario_names), slug=person_slug)
+                except Exception as e:
+                    log(f"  ⚠️ Claim→scenario wiring failed for {title[:50]}: {e}")
         count += 1
 
     return count, skipped, fc_success, fc_fail

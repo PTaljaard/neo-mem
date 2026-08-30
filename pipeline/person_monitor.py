@@ -20,6 +20,12 @@ CHAT_BASE = "http://localhost:20128/v1"
 
 log = print
 
+# Reuse the futures-studies classifier + slug helper from the news ingester so
+# the scenario universe and relationship semantics stay identical across the
+# pipeline (single source of truth).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from news_ingester import classify_claims_against_scenarios, _slugify, KNOWN_SCENARIOS
+
 
 def parse_date(date_str):
     """Parse RSS date to ISO format for Neo4j."""
@@ -116,7 +122,7 @@ Text: {text[:4000]}"""
         return [], []
 
 
-def store_in_neo4j(n4j, emb_client, article, claims_texts, claims_confs, dry_run=False):
+def store_in_neo4j(n4j, emb_client, article, claims_texts, claims_confs, dry_run=False, llm=None):
     """Store as NewsArticle + Claim nodes, linked to Person."""
     uid = hashlib.md5(article["url"].encode()).hexdigest()[:16]
     person = normalize_name(article["person"])
@@ -166,6 +172,37 @@ def store_in_neo4j(n4j, emb_client, article, claims_texts, claims_confs, dry_run
             s.run("MATCH (n:NewsArticle {uid: $nu}), (c:Claim {uid: $cu}) MERGE (n)-[:CONTAINS_CLAIM]->(c)",
                   nu=uid, cu=cuid)
 
+        # ── Claim → Scenario wiring + author attribution ────────────────────
+        # Opportunistic LLM classification; errors never crash the ingest.
+        if llm is not None and claims_texts:
+            try:
+                classified = classify_claims_against_scenarios(claims_texts, llm)
+                linked_scenario_names = set()
+                article_claim_uids = [f"{uid}-c{i}" for i in range(len(claims_texts))]
+                for ci, scen_name, rel in classified:
+                    cuid = article_claim_uids[ci]
+                    # MERGE scenario by name (futures-studies identity == name).
+                    s.run("""
+                        MERGE (sc:Scenario {name: $sname})
+                        WITH sc
+                        MATCH (c:Claim {uid: $cuid})
+                        MERGE (c)-[:%(REL)s]->(sc)
+                    """ % {"REL": rel}, sname=scen_name, cuid=cuid)
+                    linked_scenario_names.add(scen_name)
+                # Attribute authorship: person is monitored, so ALL scenarios
+                # their commentary touches are authored by them.
+                if linked_scenario_names:
+                    person_slug = _slugify(person)
+                    s.run("""
+                        MATCH (p:Person {name: $pname})
+                        UNWIND $scn_names AS sname
+                        MERGE (sc:Scenario {name: sname})
+                        MERGE (p)-[:AUTHORED]->(sc)
+                        SET sc.author_uid = CASE WHEN sc.author_uid IS NULL THEN $slug ELSE sc.author_uid END
+                    """, pname=person, scn_names=sorted(linked_scenario_names), slug=person_slug)
+            except Exception as e:
+                log(f"  ⚠️ Claim→scenario wiring failed for {article['title'][:50]}: {e}")
+
         log(f"  ✅ Stored: {article['title'][:50]} → {len(claims_texts)} claims, linked to {person}")
         return True
 
@@ -190,7 +227,7 @@ def main():
     for article in articles:
         text = f"{article['title']}. {article['description']}"
         claims, confs = extract_claims(text, llm, args.claims)
-        if store_in_neo4j(n4j, emb, article, claims, confs, args.dry_run):
+        if store_in_neo4j(n4j, emb, article, claims, confs, args.dry_run, llm=llm):
             stored += 1
         time.sleep(1)  # Rate limit
 
