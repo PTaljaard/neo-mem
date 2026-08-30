@@ -24,10 +24,34 @@ FAI = Path("/srv/kb/pieter/Failed")
 def extract_text_from_file(file_path: Path) -> str:
     """
     Detect file type and extract raw string content.
-    Supports PDF, ODT, and Images (for OCR).
+    Supports PDF, ODT, Images (for OCR), plus Markdown/plain-text/docs.
     """
     ext = file_path.suffix.lower()
-    if ext == ".pdf":
+    if ext == ".md":
+        raw = file_path.read_text(encoding="utf-8", errors="replace")
+        # Strip common Markdown markup for cleaner text
+        raw = re.sub(r"```.*?```", " ", raw, flags=re.S)
+        raw = re.sub(r"[#>*`~|]", " ", raw)
+        raw = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", raw)
+        raw = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", raw)
+        raw = re.sub(r"!\[\[[^\]]*\]\]", " ", raw)
+        raw = re.sub(r"\s+", " ", raw).strip()
+        return raw
+
+    elif ext == ".txt":
+        return file_path.read_text(encoding="utf-8", errors="replace").strip()
+
+    elif ext == ".docx":
+        # python-docx
+        try:
+            import docx
+            d = docx.Document(str(file_path))
+            return "\n".join(p.text for p in d.paragraphs).strip()
+        except Exception as e:
+            log.error(f"DOCX extraction failed for {file_path.name}: {e}")
+            return ""
+
+    elif ext == ".pdf":
         import fitz
         doc = fitz.open(file_path)
         raw = " ".join(p.get_text() for p in doc).strip()
@@ -159,8 +183,8 @@ def main():
 
     remaining = args.max
     while True:
-        # Support PDF, ODT, and common image formats (case-insensitive)
-        patterns = ["*.[pP][dD][fF]", "*.[oO][dD][tT]", "*.[jJ][pP][gG]", "*.[jJ][pP][eE][gG]", "*.[pP][nN][gG]", "*.[tT][iI][fF][fF]", "*.[bB][mM][pP]"]
+        # Support Markdown, plain text, DOCX, PDF, ODT, and common image formats (case-insensitive)
+        patterns = ["*.[pP][dD][fF]", "*.[oO][dD][tT]", "*.[jJ][pP][gG]", "*.[jJ][pP][eE][gG]", "*.[pP][nN][gG]", "*.[tT][iI][fF][fF]", "*.[bB][mM][pP]", "*.[mM][dD]", "*.[tT][xX][tT]", "*.[dD][oO][cC][xX]"]
         files = []
         for pattern in patterns:
             files.extend(INC.glob(pattern))
