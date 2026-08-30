@@ -15,7 +15,7 @@ NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 EMBED_MODEL = "mxbai-embed-large"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
-CHAT_MODEL = "oc/nemotron-3-ultra-free"   # Via OmniRoute
+CHAT_MODEL = "auto/best-free"   # Via OmniRoute aggregator (auto-routes to healthiest free model; stable vs single oc/*-free)
 CHAT_BASE = "http://localhost:20128/v1"
 
 log = print
