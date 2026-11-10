@@ -66,8 +66,11 @@ def main():
     ext_p.add_argument("doc_uid", help="Document UID in Neo4j")
 
     # ── batch ───────────────────────────────────────────────────────────
-    batch_p = sub.add_parser("batch", help="Batch ingest all PDFs in a directory")
+    batch_p = sub.add_parser("batch", help="Batch ingest all PDFs in a directory, then LLM-extract entities/facts")
     batch_p.add_argument("directory", help="Directory containing PDFs")
+    batch_p.add_argument("--no-extract", action="store_true", help="Only embed (batch_ingest); skip the LLM entity/fact extraction stage")
+    batch_p.add_argument("--max", type=int, default=None, help="Max files to process in the embed stage")
+    batch_p.add_argument("--sleep", type=float, default=3.0, help="Seconds to sleep between files")
 
     # ── one-time scripts ────────────────────────────────────────────────
     sub.add_parser("migrate-claims", help="Migrate claim arrays to Claim nodes (one-time)")
@@ -197,6 +200,20 @@ def main():
 
     if args.command == "list-tasks":
         os.system("hermes kanban boards switch phd-pipeline 2>/dev/null; hermes kanban list")
+        sys.exit(0)
+
+    # ── batch: embed stage, then LLM entity/fact extraction stage ───────
+    if args.command == "batch":
+        batch_args = []
+        if getattr(args, "max", None):
+            batch_args += ["--max", str(args.max)]
+        if getattr(args, "sleep", None):
+            batch_args += ["--sleep", str(args.sleep)]
+        batch_args += [args.directory]
+        run_script("batch_ingest.py", batch_args)   # exits on failure
+        if not getattr(args, "no_extract", False):
+            print("🔄 Embed stage complete. Running LLM entity/fact extraction over all chunks...")
+            run_script("extract_entities.py", ["--all"])
         sys.exit(0)
 
     if args.command in script_map:

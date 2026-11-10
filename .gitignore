@@ -27,3 +27,28 @@ qdrant_storage/
 papers/
 kb/
 *.pdf
+
+# Test/debug/one-off scripts (not production pipeline)
+pipeline/_*.py
+pipeline/debug_*.py
+pipeline/check_*.py
+pipeline/query_*.py
+pipeline/extract_*_existing*.py
+pipeline/extract_myburgh_*.py
+pipeline/ingest_myburgh_*.py
+pipeline/insert_myburgh_*.py
+pipeline/classify_existing_claims.py
+pipeline/classify_last_claim.py
+pipeline/list_scenarios.py
+pipeline/run_clem_seed.py
+pipeline/save_amber_claims.py
+pipeline/save_research.py
+pipeline/extract_entities.log
+pipeline/extract_entities_v1.py
+pipeline/meta_kb.py
+pipeline/governance.py
+pipeline/compare_models.py
+
+# Logs
+logs/
+*.log

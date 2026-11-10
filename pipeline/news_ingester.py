@@ -21,14 +21,15 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────
-NEO4J_URI = "bolt://192.168.1.20:7687"
+NEO4J_URI = "bolt://100.118.200.88:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "nomic-embed-text:latest"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
-CHAT_MODEL = "auto/best-free"   # Via OmniRoute aggregator (auto-routes to healthiest free model; stable vs single oc/*-free)
-CHAT_BASE = "http://localhost:20128/v1"
-FIRECRAWL_KEY = "fc-cceb0426298f473bb8cef0a512924bab"
+CHAT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+CHAT_BASE = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "sk-or-...e8c5")
+FIRECRAWL_KEY = "«redacted:fc-…»"
 FIRECRAWL_URL = "https://api.firecrawl.dev/v1/scrape"
 
 # Futures-studies scenario universe. Scenario identity in Neo4j == name.
@@ -87,7 +88,7 @@ def fetch_rss_articles(limit=6):
                     title = item.findtext("title", "")
                     desc = item.findtext("description", "")
                     link = item.findtext("link", "")
-                    pub_date = item.findtext("pubDate", datetime.datetime.utcnow().isoformat())
+                    pub_date = item.findtext("pubDate", datetime.datetime.now(datetime.UTC).isoformat())
                     source_name = feed_url.split("/")[2].replace("www.", "")
                     if title and link:
                         articles.append({
@@ -141,7 +142,7 @@ def _parse_date(date_str):
         parsed = email.utils.parsedate_to_datetime(date_str)
         return parsed.isoformat()
     except:
-        return datetime.datetime.utcnow().isoformat()
+        return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 def scrape_text(url):
@@ -241,7 +242,7 @@ Claims:
         resp = llm.chat.completions.create(
             model=CHAT_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1, max_tokens=600
+            temperature=0.1, max_tokens=3000
         )
         content = resp.choices[0].message.content.strip()
         content = re.sub(r"```(?:json)?\s*", "", content).strip()
@@ -445,7 +446,7 @@ def main():
         log(f"  🔥 Firecrawl: enabled (free tier: 500/mo, using ~{args.max_articles}/day = ~{args.max_articles*30}/mo)")
 
     emb = OpenAI(api_key="ollama", base_url=EMBED_BASE)
-    llm = OpenAI(api_key="ollama", base_url=CHAT_BASE)   # OmniRoute chat for claim extraction
+    llm = OpenAI(api_key=OPENROUTER_API_KEY, base_url=CHAT_BASE)   # OpenRouter chat for claim extraction
     neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     create_index(neo4j)
 

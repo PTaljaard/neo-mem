@@ -13,7 +13,7 @@ NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
 EMBED_MODEL = "mxbai-embed-large"
-EMBED_BASE = "http://192.168.0.200:11434/v1"
+EMBED_BASE = "http://100.118.200.88:11434/v1"
 PDF_PATH = "C:\\Users\\ptalj\\AppData\\Local\\Temp\\2603.20059.pdf"
 PAPER_TITLE = "DIAL-KG: Schema-Free Incremental Knowledge Graph Construction via Dynamic Schema Induction and Evolution-Intent Assessment"
 

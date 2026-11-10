@@ -14,11 +14,11 @@ log = logging.getLogger("batch-ingest")
 
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://192.168.1.20:7687")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://192.168.1.20:6333")
-EMBED_MODEL = os.getenv("EMBEDDING_MODEL", "mxbai-embed-large")
-EMBED_BASE = os.getenv("EMBEDDING_BASE_URL", "http://192.168.0.200:11434/v1")
-INC = Path("/srv/kb/pieter/Incoming")
-ING = Path("/srv/kb/pieter/Ingested")
-FAI = Path("/srv/kb/pieter/Failed")
+EMBED_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text:latest")
+EMBED_BASE = os.getenv("OLLAMA_BASE_URL", "http://100.118.200.88:11434/v1")
+INC = Path("/home/pt/neo-mem-wsl/docs/kb/pieter/Incoming")
+ING = Path("/home/pt/neo-mem-wsl/docs/kb/pieter/Ingested")
+FAI = Path("/home/pt/neo-mem-wsl/docs/kb/pieter/Failed")
 
 
 def extract_text_from_file(file_path: Path) -> str:
@@ -158,7 +158,7 @@ def main():
 
     ec = OpenAI(api_key="ollama", base_url=EMBED_BASE)
     n4j = GraphDatabase.driver(NEO4J_URI, auth=("neo4j", "Erna#26neo4j"))
-    qd = QdrantClient(QDRANT_URL, timeout=60)
+    qd = QdrantClient(QDRANT_URL, timeout=60, check_compatibility=False)
 
     # Ensure Qdrant collection
     try:

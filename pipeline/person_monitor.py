@@ -13,10 +13,11 @@ from openai import OpenAI
 NEO4J_URI = "bolt://192.168.1.20:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "Erna#26neo4j"
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "nomic-embed-text:latest"
 EMBED_BASE = "http://192.168.0.200:11434/v1"
-CHAT_MODEL = "auto/best-free"   # Via OmniRoute aggregator (auto-routes to healthiest free model; stable vs single oc/*-free)
-CHAT_BASE = "http://localhost:20128/v1"
+CHAT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+CHAT_BASE = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "sk-or-...e8c5")
 
 log = print
 
@@ -34,7 +35,7 @@ def parse_date(date_str):
         parsed = email.utils.parsedate_to_datetime(date_str)
         return parsed.isoformat()
     except:
-        return datetime.datetime.utcnow().isoformat()
+        return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 def normalize_name(name):
@@ -217,7 +218,7 @@ def main():
 
     log(f"🔍 Monitoring: {args.person} (last {args.days} days)")
     emb = OpenAI(api_key="ollama", base_url=EMBED_BASE)
-    llm = OpenAI(api_key="ollama", base_url=CHAT_BASE)   # OmniRoute chat for claims
+    llm = OpenAI(api_key=OPENROUTER_API_KEY, base_url=CHAT_BASE)   # OpenRouter chat for claims
     n4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
     articles = search_commentary(args.person, args.days)

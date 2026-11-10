@@ -66,14 +66,16 @@ All config is in `pipeline_config.py`, read from environment variables:
 
 ```bash
 # Defaults point to the home setup:
-NEO4J_URI=bolt://192.168.0.114:7687
+NEO4J_URI=bolt://192.168.1.20:7687
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=Erna#26neo4j
-OLLAMA_BASE_URL=http://192.168.0.200:11434/v1
+OLLAMA_BASE_URL=http://100.118.200.88:11434/v1
 EMBEDDING_MODEL=nomic-embed-text
 CHAT_MODEL=gemma4:e4b-it-qat
 KB_ROOT=/srv/kb/pieter
 ```
+
+> **Note (2026-10-10)**: R9 now runs WSL2 in **Mirrored networking mode**. Windows host and WSL share IP `169.254.27.18`. Ollama on Windows is reachable from WSL at `http://169.254.27.18:11434/v1` **or** `http://localhost:11434/v1` (shared loopback). The Tailscale IP `100.118.200.88` (r9lg) remains the primary cross-host path.
 
 Override any setting for travel or testing:
 ```bash
